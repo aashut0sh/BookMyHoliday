@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_0588e87f_19b7_4da1_830b_ecccfc2007a1_Output_Variables_rating = Any
+

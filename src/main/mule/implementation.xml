@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="getFlights" doc:id="4f6f473d-8aef-4ece-932e-ad471ed13b93" >
+		<logger level="INFO" doc:name="Logger" doc:id="2f98e93b-2b89-4ba6-92e9-9342042ae0df" message="Flight fetching Start!"/>
+		<db:select doc:name="Select" doc:id="9b0659fd-351f-40b4-8b66-2b39063c6b05" config-ref="Database_Config" queryTimeoutUnit="NANOSECONDS">
+			<reconnect />
+			<db:sql ><![CDATA[select * FROM FLIGHTS
+WHERE source = :source AND
+destination = :destination AND
+departure_date = :date]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+'source' : attributes.queryParams.origin as String,
+'destination' : attributes.queryParams.destination as String,
+'date' : attributes.queryParams.departure_date as String
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="4e86efc5-a67d-4573-a6e8-aa4551201c34" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map {
+	"Airline" : $.airline_name,
+	"From" : $.source,
+	"To": $.destination,
+	"Departure Date" : $.departure_date,
+	"Fare" : $.price,
+	"Empty Seats" : $.available_seats
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="817132d8-47ca-4de2-b9cd-aa0c232cf2ec" message="Flights Fetched!!"/>
+	</flow>
+	<flow name="bookFlight" doc:id="d974aa9e-b9a5-4b7c-9e80-d9f1d4bfdf16" >
+		<set-variable value="#[payload.PassengerName]" doc:name="Set Variable" doc:id="aab69345-54aa-49ad-8cce-9b6ba2260cae" variableName="passengerName"/>
+		<db:insert doc:name="Insert" doc:id="fc5ea014-b168-4538-88b2-19a5b8724782" config-ref="Database_Config">
+			<reconnect />
+			<db:sql ><![CDATA[INSERT INTO FLIGHT_BOOKING
+VALUES (:passenger_name,:origin,:dest,:date,:passengers,:email)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'passenger_name': payload.PassengerName[0],
+	'origin':payload.Origin,
+	'dest':payload.Destination,
+	 'date':payload.DepartureDate,
+	 'passengers':payload.NoOfPassengers,
+	 'email':payload.Email
+}]]]></db:input-parameters>
+		</db:insert>
+		<ee:transform doc:name="Transform Message" doc:id="2e6fd270-4a7b-4063-a33e-2b2ef1e6491b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "Message": "Yayy! Flight Booked Successfully.",
+  "Passengers": [
+    vars.passengerName
+  ],
+  "BookingId": "6E12345"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="10b703fe-28bb-41e7-a707-1ffa081028af" />
+	</flow>
+	<flow name="getHotels" doc:id="0588e87f-19b7-4da1-830b-ecccfc2007a1" >
+		<set-variable value="#[attributes.queryParams.MaxPrice]" doc:name="Set Variable" doc:id="8a78af72-d33d-45d7-baba-5acd0bd39818" variableName="MaxPrice"/>
+		<set-variable value="#[attributes.queryParams.rating]" doc:name="Set Variable" doc:id="b921b18a-a339-4b76-ba77-a990f522fbfb" variableName="rating"/>
+		<choice doc:name="Choice" doc:id="850d8805-3660-4d38-b7b5-c9e1731f57c0" >
+			<when expression="#[!isEmpty(vars.MaxPrice)]">
+				<db:select doc:name="Select" doc:id="6ec116da-ecd7-4666-986e-4b0f6adf5914" config-ref="Database_Config">
+					<reconnect />
+					<db:sql><![CDATA[Select * from HOTEL where city= :city and price <= :MaxPrice]]></db:sql>
+					<db:input-parameters><![CDATA[#[{'city' : attributes.queryParams.city,"MaxPrice" : attributes.queryParams.MaxPrice}]]]></db:input-parameters>
+				</db:select>
+			</when>
+			<when expression="#[!isEmpty(vars.rating)]">
+				<db:select doc:name="Select" doc:id="2978f93f-d1d3-40b5-a740-0214b553f38c" config-ref="Database_Config">
+					<reconnect />
+					<db:sql ><![CDATA[Select * from HOTEL where city= :city and rating >= :rating]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{"rating" : vars.rating,'city' : attributes.queryParams.city }]]]></db:input-parameters>
+				</db:select>
+			</when>
+			<otherwise>
+				<db:select doc:name="Select" doc:id="290ea8fb-43de-46ed-8d4c-581e93349d34" config-ref="Database_Config">
+					<reconnect />
+					<db:sql><![CDATA[Select * from HOTEL where city= :city]]></db:sql>
+					<db:input-parameters><![CDATA[#[{'city' : attributes.queryParams.city}]]]></db:input-parameters>
+				</db:select>
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="Transform Message" doc:id="6c585536-4a6d-4907-991b-f6d0f32874a9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+	if(sizeOf(payload)==0){
+		"Message":"No hotel available for the current Search! Try different city/filters" 
+	}else{
+		"Hotels:" : payload
+	}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="8b7d0a7f-0495-4cb3-8cdb-28b55b7b4619" message="#[payload]"/>
+	</flow>
+	<flow name="bookHotel" doc:id="a75547f7-e650-4118-97e0-7231f424c2cb" >
+		<db:insert doc:name="Insert" doc:id="c395ca36-b72f-490e-a4e2-fe2bb799f191" config-ref="Database_Config">
+			<reconnect />
+			<db:sql ><![CDATA[INSERT INTO BOOKHOTEL VALUES (:guestname,:city,:checkin,:checkout,:roomnumber,:numguests,:hotelname)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{"guestname" : payload.GuestName, "city" : payload.City, "checkin" : payload.CheckIn, "checkout" : payload.CheckOut, "roomnumber": payload.Rooms , "numguests" : payload.Guests , "hotelname" : payload.HotelName}]]]></db:input-parameters>
+		</db:insert>
+		<ee:transform doc:name="Transform Message" doc:id="33982a7d-ae16-406a-bb8a-a6cfd68771ed" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Message": "Hotel Booked! Enjoy your Stay"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="a9c77a9f-4a30-4994-a32a-6756ee9c2d72" message='#["Hotel Booked!! Enjoy your Stay!!"]'/>
+	</flow>
+</mule>

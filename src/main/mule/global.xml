@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="8c01fd89-1f55-46d8-86b1-3a7bb504651c" >
+		<db:my-sql-connection host="sql6.freemysqlhosting.net" port="3306" user="sql6454207" password="apmJXuzefF" database="sql6454207" />
+	</db:config>
+	<configuration doc:name="Configuration" doc:id="bd1e1fcf-69d8-4612-9a0b-54a595bf31ed" defaultErrorHandler-ref="globalError_Handler" />
+	<api-gateway:autodiscovery apiId="17475679" ignoreBasePath="true" doc:name="API Autodiscovery" doc:id="b0312c8d-278f-4704-9e3d-9a40a272d7e2" flowRef="book-my-holiday-main" />
+	<error-handler name="globalError_Handler" doc:id="4fdaf15e-39ed-435d-a1e5-6a7b58cc5986" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="648c34e7-0a10-4edc-88d8-8b526222f543" type="DB:CONNECTIVITY,DB:BAD_SQL_SYNTAX">
+			<ee:transform doc:name="Transform Message" doc:id="68afbc32-9e32-4db9-8d58-3843b24af249" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "Data unavailable. Please try again later!"
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		</on-error-propagate>
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="efdf8fa3-3c4e-45b4-8525-821b80e11c07" type="ANY">
+			<ee:transform doc:name="Transform Message" doc:id="6a2f94f0-0def-4cc7-b28b-7dc3af3cc756" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Message" : error.description
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		</on-error-continue>
+	</error-handler>
+</mule>
